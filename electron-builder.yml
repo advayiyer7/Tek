@@ -36,13 +36,15 @@ nsis:
   oneClick: true
   deleteAppDataOnUninstall: false
 
+# Apple Silicon only for now — Intel build needs a darwin-x64 python and a
+# second pass; revisit if anyone asks.
 mac:
   target:
     - target: dmg
-      arch: [arm64, x64]
+      arch: [arm64]
   category: public.app-category.productivity
   extraResources:
-    - from: build-python/darwin-${arch}/python
+    - from: build-python/darwin-arm64/python
       to: python
 
 linux:

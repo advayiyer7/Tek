@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      attach_to_release:
+        description: 'Release tag to attach built installers to (empty = skip)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dist: dist:linux
+            artifact_glob: 'dist/*.AppImage'
+          - os: macos-latest
+            dist: dist:mac
+            artifact_glob: 'dist/*.dmg'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Set up sidecar venv
+        run: npm run sidecar:setup
+
+      - name: Retrieval eval (downloads embedding + reranker models once)
+        run: sidecar/.venv/bin/python sidecar/eval_retrieval.py
+        working-directory: .
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build app bundles
+        run: npm run build
+
+      - name: Install Playwright (driver only, no browsers)
+        run: npm install --no-save playwright
+
+      - name: GUI smoke test (Linux, under Xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/ci-smoke.mjs
+
+      - name: GUI smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: node scripts/ci-smoke.mjs
+
+      - name: Build installer
+        run: npm run ${{ matrix.dist }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tek-${{ runner.os }}
+          path: |
+            ${{ matrix.artifact_glob }}
+            smoke-screenshot.png
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: github.event_name == 'workflow_dispatch' && inputs.attach_to_release != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.attach_to_release }}" ${{ matrix.artifact_glob }} --clobber
