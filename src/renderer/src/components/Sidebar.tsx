@@ -1,4 +1,5 @@
 import type { SidecarStatus } from '../../../shared/types'
+import logoUrl from '../assets/logo.png'
 
 export type Page = 'chat' | 'search' | 'library' | 'actions' | 'settings'
 
@@ -70,11 +71,12 @@ export function Sidebar({
   return (
     <aside className="flex w-52 shrink-0 flex-col border-r border-ink-700/50 bg-ink-900/40">
       <div className="flex items-center gap-2.5 px-4 py-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 shadow-lg shadow-teal-500/20">
-          <svg viewBox="0 0 24 24" className="size-4.5 text-ink-950" fill="currentColor">
-            <path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-5v11a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V8H5a1 1 0 0 1-1-1V5z" />
-          </svg>
-        </div>
+        <img
+          src={logoUrl}
+          alt="Tek"
+          className="size-9 rounded-lg border border-ink-700/60 shadow-lg shadow-sky-500/20"
+          draggable={false}
+        />
         <div className="leading-tight">
           <h1 className="text-[15px] font-semibold tracking-wide text-zinc-100">Tek</h1>
           <p className="text-[10px] text-zinc-500">local-first file agent</p>

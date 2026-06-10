@@ -16,6 +16,9 @@ function createWindow(): void {
     title: 'Tek',
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
+    // Packaged builds get the icon from the executable (electron-builder);
+    // this covers the dev window on Windows/Linux.
+    ...(app.isPackaged ? {} : { icon: join(app.getAppPath(), 'build', 'icon.png') }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
