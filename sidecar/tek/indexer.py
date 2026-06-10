@@ -111,6 +111,7 @@ class Indexer:
                     self._index_one(entry, prog)
                 prog.processed_files += 1
 
+            self.store.maybe_create_ann_index()
             prog.state = "done"
         except Exception as exc:  # noqa: BLE001
             log.exception("indexing failed")

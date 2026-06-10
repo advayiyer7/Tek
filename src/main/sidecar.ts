@@ -40,7 +40,7 @@ export class Sidecar {
 
     try {
       const port = await getFreePort()
-      const pythonPath = this.resolvePython()
+      const pythonPath = await this.ensurePython()
       const dataDir = join(app.getPath('userData'), 'tek-data')
       mkdirSync(dataDir, { recursive: true })
       const child = spawn(
@@ -160,22 +160,65 @@ export class Sidecar {
       : join(app.getAppPath(), 'sidecar')
   }
 
-  private resolvePython(): string {
-    const venvPython =
-      process.platform === 'win32'
-        ? join(this.sidecarDir(), '.venv', 'Scripts', 'python.exe')
-        : join(this.sidecarDir(), '.venv', 'bin', 'python')
+  /** The venv lives in the repo during dev, in userData when packaged
+   * (resources/ is read-only on installed apps). */
+  private venvDir(): string {
+    return app.isPackaged
+      ? join(app.getPath('userData'), 'sidecar-venv')
+      : join(this.sidecarDir(), '.venv')
+  }
+
+  private venvPython(): string {
+    return process.platform === 'win32'
+      ? join(this.venvDir(), 'Scripts', 'python.exe')
+      : join(this.venvDir(), 'bin', 'python')
+  }
+
+  private async ensurePython(): Promise<string> {
+    const venvPython = this.venvPython()
     if (existsSync(venvPython)) return venvPython
-    // Fall back to a system Python so `npm run dev` still works before
-    // `npm run sidecar:setup` — deps may be missing, which surfaces as an
-    // early-exit error with the pip hint in stderr.
-    return process.platform === 'win32' ? 'python' : 'python3'
+    if (!app.isPackaged) {
+      // Dev convenience: fall back to system Python; missing deps surface as
+      // an early-exit error pointing at `npm run sidecar:setup`.
+      return process.platform === 'win32' ? 'python' : 'python3'
+    }
+    // Packaged first run: build the environment once. Requires a system
+    // Python 3.10+ — installer-bundled runtime is a future improvement.
+    const systemPython = process.platform === 'win32' ? 'python' : 'python3'
+    console.log('[tek] first run — creating Python environment (one time, ~1 min)')
+    try {
+      await runOnce(systemPython, ['-m', 'venv', this.venvDir()])
+      await runOnce(venvPython, [
+        '-m', 'pip', 'install', '--no-input', '--quiet',
+        '-r', join(this.sidecarDir(), 'requirements.txt')
+      ])
+    } catch (err) {
+      throw new Error(
+        'Tek could not set up its Python engine. Install Python 3.10+ from python.org ' +
+          `and relaunch. (${err instanceof Error ? err.message : String(err)})`
+      )
+    }
+    return venvPython
   }
 
   private setStatus(status: SidecarStatus): void {
     this.currentStatus = status
     for (const listener of this.listeners) listener(status)
   }
+}
+
+function runOnce(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+    let stderr = ''
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk)
+    })
+    child.on('error', reject)
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(stderr.trim().slice(-400) || `exit code ${code}`))
+    )
+  })
 }
 
 function getFreePort(): Promise<number> {

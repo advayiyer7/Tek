@@ -100,6 +100,26 @@ class Store:
             self._chunks.delete(predicate)
             self._files.delete(predicate)
 
+    def maybe_create_ann_index(self) -> None:
+        """Build an ANN index once the library is big enough to need one.
+
+        Below ~20k chunks LanceDB's brute-force scan is already a few ms, and
+        IVF-PQ needs enough rows to train well — so only index past that.
+        Idempotent: replace=False makes re-calls cheap no-ops.
+        """
+        try:
+            count = self._chunks.count_rows()
+            if count < 20_000:
+                return
+            with self._lock:
+                self._chunks.create_index(
+                    metric="cosine", vector_column_name="vector", replace=False
+                )
+            log.info("ANN index ensured for %d chunks", count)
+        except Exception as exc:  # noqa: BLE001 — index is an optimization, never fatal
+            if "already exist" not in str(exc).lower():
+                log.warning("ANN index creation skipped: %s", exc)
+
     # -- search ------------------------------------------------------------
 
     def search(self, vector: list[float], k: int = 8) -> list[dict]:

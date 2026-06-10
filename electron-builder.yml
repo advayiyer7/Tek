@@ -1,0 +1,46 @@
+appId: com.advayiyer.tek
+productName: Tek
+copyright: Copyright © 2026 Advay Iyer
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+
+# Ship the sidecar source + requirements; the Python venv is created in
+# userData on first run (resources/ is read-only when installed).
+extraResources:
+  - from: sidecar
+    to: sidecar
+    filter:
+      - '**/*'
+      - '!.venv/**'
+      - '!__pycache__/**'
+      - '!**/__pycache__/**'
+      - '!eval_retrieval.py'
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.productivity
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Utility
+
+npmRebuild: false
