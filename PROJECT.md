@@ -50,6 +50,14 @@ download, hosted on my portfolio.
   (by type/date), AI rename + summarize (Ollama)
 - [x] electron-builder config (NSIS / dmg / AppImage) + first-run venv
   bootstrap on packaged installs
+- [x] Retrieval v2: hybrid search (vector + native BM25 over text+filename,
+  RRF fusion), cross-encoder reranking (ms-marco MiniLM, lazy/optional),
+  filename-context embeddings, sentence-clean chunk overlap, cross-file embed
+  batching. Eval: 19/19 probes top-1 (incl. exact-keyword + paraphrase),
+  2/2 negative probes correctly empty, ~190ms/query.
+- [x] Multi-turn chat: conversation history + LLM query-rewrite for
+  follow-ups; verified E2E through the real UI (Playwright driver in
+  `scripts/drive-*.mjs`).
 
 ## Remaining / future
 
@@ -74,3 +82,7 @@ download, hosted on my portfolio.
 | 2026-06-09 | Sidecar plans actions; only Electron main executes, post-confirm; deletes → recycle bin | Safety contract in one place |
 | 2026-06-09 | No-Ollama degraded mode: search + extractive answers + hash/rule actions | App is useful with zero extra installs |
 | 2026-06-10 | Packaged builds create the Python venv in userData on first run (needs system Python) | Honest v0 packaging; bundled runtime later |
+| 2026-06-10 | Hybrid retrieval: vector + lance-native BM25 (text+name), RRF fusion | bge-small misses exact keywords (IPs, API names); BM25 nails them — both probes classes now pass |
+| 2026-06-10 | Cross-encoder rerank (Xenova/ms-marco-MiniLM-L-6-v2 via fastembed) with prob floor 0.02 | Big top-k precision win at ~150ms; floor gives an honest "no answer" signal (negative probes return empty) |
+| 2026-06-10 | Embed `parent/filename` header with each chunk (never stored) | Connects topic queries to the file they live in; zero storage cost |
+| 2026-06-10 | Chunks-table schema change ⇒ drop + rebuild on open | Index is a cache of local files; a one-time reindex beats migration code |

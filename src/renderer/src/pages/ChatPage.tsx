@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Citation, OllamaStatus } from '../../../shared/types'
+import type { ChatTurn, Citation, OllamaStatus } from '../../../shared/types'
 
 interface ChatMessage {
   id: number
@@ -75,13 +75,18 @@ export function ChatPage({
     const question = input.trim()
     if (!question || activeChatId || !online) return
     setInput('')
+    // Completed turns (with real text) become context for follow-up questions.
+    const history: ChatTurn[] = messages
+      .filter((m) => !m.streaming && !m.error && m.text.trim().length > 0)
+      .slice(-8)
+      .map((m) => ({ role: m.role, content: m.text }))
     setMessages((prev) => [
       ...prev,
       { id: nextId++, role: 'user', text: question, citations: [] },
       { id: nextId++, role: 'assistant', text: '', citations: [], streaming: true }
     ])
     try {
-      const id = await window.tek.chat.start(question)
+      const id = await window.tek.chat.start(question, history)
       setActiveChatId(id)
     } catch (err) {
       setMessages((prev) => {

@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 DEFAULT_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+DEFAULT_RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
 DEFAULT_LLM_MODEL = "llama3.2:3b"
 OLLAMA_URL = "http://127.0.0.1:11434"
 
@@ -23,6 +24,8 @@ class Settings(BaseModel):
 
     folders: list[str] = Field(default_factory=list)
     embed_model: str = DEFAULT_EMBED_MODEL
+    rerank_model: str = DEFAULT_RERANK_MODEL
+    rerank_enabled: bool = True
     llm_model: str = DEFAULT_LLM_MODEL
     watch_enabled: bool = True
     # Cloud is strictly opt-in and unused unless explicitly enabled. Keys are

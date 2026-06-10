@@ -2,7 +2,7 @@ import { dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
 import { promises as fs } from 'fs'
 import { dirname } from 'path'
-import type { ActionOperation, ChatEvent, ExecResult } from '../shared/types'
+import type { ActionOperation, ChatEvent, ChatTurn, ExecResult } from '../shared/types'
 import type { Sidecar } from './sidecar'
 
 const activeChats = new Map<string, AbortController>()
@@ -44,14 +44,26 @@ export function registerIpc(sidecar: Sidecar): void {
   ipcMain.handle('ollama:status', () => sidecar.request('/ollama/status', { timeoutMs: 8_000 }))
 
   // -- chat (streamed over webContents events) -------------------------------
-  ipcMain.handle('chat:start', (event, question: unknown) => {
+  ipcMain.handle('chat:start', (event, question: unknown, history: unknown) => {
     if (typeof question !== 'string' || !question.trim() || question.length > 4000) {
       throw new Error('Invalid question')
     }
+    const turns: ChatTurn[] = Array.isArray(history)
+      ? (history as ChatTurn[])
+          .filter(
+            (t) =>
+              t &&
+              (t.role === 'user' || t.role === 'assistant') &&
+              typeof t.content === 'string' &&
+              t.content.trim().length > 0
+          )
+          .slice(-12)
+          .map((t) => ({ role: t.role, content: t.content.slice(0, 8000) }))
+      : []
     const id = randomUUID()
     const controller = new AbortController()
     activeChats.set(id, controller)
-    void pumpChat(sidecar, id, question, controller, event.sender)
+    void pumpChat(sidecar, id, question, turns, controller, event.sender)
     return id
   })
 
@@ -91,6 +103,7 @@ async function pumpChat(
   sidecar: Sidecar,
   id: string,
   question: string,
+  history: ChatTurn[],
   controller: AbortController,
   sender: Electron.WebContents
 ): Promise<void> {
@@ -98,7 +111,7 @@ async function pumpChat(
     if (!sender.isDestroyed()) sender.send('chat:event', { id, event })
   }
   try {
-    const res = await sidecar.stream('/chat', { question }, controller.signal)
+    const res = await sidecar.stream('/chat', { question, history }, controller.signal)
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''

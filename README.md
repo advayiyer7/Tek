@@ -15,15 +15,19 @@ file contents. Cloud models will be strictly opt-in.
 - **Index** folders you choose: `.txt`/`.md`/code/PDF/DOCX, filtered aggressively
   (media, binaries, archives skipped). Incremental — only changed files are
   re-embedded, and a file watcher keeps the index live.
-- **Semantic search** across everything, with similarity scores, open/reveal.
+- **Hybrid semantic search** across everything: meaning-based (embeddings) and
+  exact-keyword (BM25) retrieval fused together, then re-ordered by a local
+  cross-encoder reranker — so both "that note about my lease" and
+  "192.168.1.40" find the right file. Similarity scores, open/reveal.
 - **Find duplicates** (content-hash) and **organize folders** (by type or date).
 - Every mutating action shows a preview first; deletions go to the recycle bin.
 
 ## What lights up with [Ollama](https://ollama.com) (free, local)
 
 - **Chat with your files** — streamed answers grounded in retrieved passages,
-  with clickable citations. Without Ollama you still get the best matching
-  passages, just not synthesized prose.
+  with clickable citations and multi-turn follow-ups ("and where are the
+  winter tires?"). Without Ollama you still get the best matching passages,
+  just not synthesized prose.
 - **AI rename** (descriptive names from content) and **summaries**.
 
 ```sh
@@ -37,7 +41,8 @@ ollama pull llama3.2:3b   # any chat model works; pick it in Settings
 | Shell | Electron + React + Vite + Tailwind ([electron-vite](https://electron-vite.org)) |
 | Engine | Python sidecar (FastAPI) on `127.0.0.1`, spawned & owned by the main process |
 | Embeddings | `bge-small-en-v1.5` (int8 ONNX via fastembed, ~130MB, fully local) |
-| Vector store | LanceDB (embedded, on-disk) |
+| Reranker | `ms-marco-MiniLM-L-6-v2` cross-encoder (ONNX, ~80MB, fully local) |
+| Vector + FTS store | LanceDB (embedded, on-disk; native BM25 full-text index) |
 | LLM | Ollama (local, optional) |
 
 The renderer is fully sandboxed and never touches the network or filesystem —

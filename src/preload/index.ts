@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type {
   ActionOperation,
   ChatEvent,
+  ChatTurn,
   DedupeResult,
   ExecResult,
   IndexStatus,
@@ -44,7 +45,8 @@ const api = {
   ollamaStatus: (): Promise<OllamaStatus> => ipcRenderer.invoke('ollama:status'),
 
   chat: {
-    start: (question: string): Promise<string> => ipcRenderer.invoke('chat:start', question),
+    start: (question: string, history?: ChatTurn[]): Promise<string> =>
+      ipcRenderer.invoke('chat:start', question, history ?? []),
     cancel: (id: string): Promise<void> => ipcRenderer.invoke('chat:cancel', id),
     onEvent: (callback: (payload: { id: string; event: ChatEvent }) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, payload: { id: string; event: ChatEvent }): void =>

@@ -30,6 +30,7 @@ from tek import rag
 from tek.config import Config
 from tek.embed import FastEmbedEmbedder
 from tek.indexer import Indexer
+from tek.rerank import Reranker
 from tek.store import Store
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -44,6 +45,11 @@ config: Config
 embedder: FastEmbedEmbedder
 store: Store
 indexer: Indexer
+reranker: Reranker
+
+
+def _active_reranker() -> Reranker | None:
+    return reranker if config.settings.rerank_enabled else None
 
 
 # ---------------------------------------------------------------- models ----
@@ -53,6 +59,12 @@ class SettingsUpdate(BaseModel):
     folders: list[str] | None = None
     llm_model: str | None = None
     watch_enabled: bool | None = None
+    rerank_enabled: bool | None = None
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(max_length=8000)
 
 
 class SearchRequest(BaseModel):
@@ -62,6 +74,7 @@ class SearchRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=20)
     k: int = Field(default=8, ge=1, le=20)
 
 
@@ -98,6 +111,11 @@ def health() -> dict:
             "ready": embedder.is_ready,
             "loading": embedder.loading,
             "error": embedder.load_error,
+        },
+        "reranker": {
+            "name": reranker.model_name,
+            "ready": reranker.is_ready,
+            "enabled": config.settings.rerank_enabled,
         },
         "index": store.stats(),
     }
@@ -148,7 +166,7 @@ def search(req: SearchRequest) -> dict:
     # Sync endpoint → FastAPI runs it in a worker thread, so lazy model load
     # (first run downloads ~130MB) doesn't block the event loop.
     started = time.perf_counter()
-    hits = rag.retrieve(store, embedder, req.query, k=req.k)
+    hits = rag.retrieve(store, embedder, req.query, k=req.k, reranker=_active_reranker())
     return {
         "results": [
             {
@@ -168,7 +186,13 @@ def search(req: SearchRequest) -> dict:
 async def chat(req: ChatRequest) -> StreamingResponse:
     async def stream():
         async for event in rag.answer_stream(
-            store, embedder, config.settings.llm_model, req.question, k=req.k
+            store,
+            embedder,
+            config.settings.llm_model,
+            req.question,
+            history=[t.model_dump() for t in req.history],
+            k=req.k,
+            reranker=_active_reranker(),
         ):
             yield json.dumps(event, ensure_ascii=False) + "\n"
 
@@ -222,11 +246,12 @@ def main() -> None:
     parser.add_argument("--data-dir", required=True, help="writable dir for settings + index")
     args = parser.parse_args()
 
-    global config, embedder, store, indexer
+    global config, embedder, store, indexer, reranker
     config = Config(Path(args.data_dir))
     embedder = FastEmbedEmbedder(config.settings.embed_model, str(config.models_dir))
     store = Store(config.db_dir, dim=embedder.dim)
     indexer = Indexer(config=config, embedder=embedder, store=store)
+    reranker = Reranker(config.settings.rerank_model, str(config.models_dir))
     if config.settings.folders and config.settings.watch_enabled:
         indexer.start_watcher()
 

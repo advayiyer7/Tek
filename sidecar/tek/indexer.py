@@ -22,7 +22,16 @@ from .store import Store
 
 log = logging.getLogger(__name__)
 
-EMBED_BATCH_FILES = 16  # files per progress tick
+EMBED_BATCH_CHUNKS = 128  # chunks pooled across files per embed call
+WATCH_FTS_REBUILD_MAX = 50_000  # above this, leave FTS refresh to full runs
+
+
+def _embed_header(path: str) -> str:
+    """Filename + parent folder, prepended to chunk text before embedding
+    (never stored): 'recipes/sourdough.md' lets the embedding connect a
+    query's topic to the file it lives in."""
+    p = Path(path)
+    return f"{p.parent.name}/{p.name}" if p.parent.name else p.name
 
 
 @dataclass
@@ -103,15 +112,51 @@ class Indexer:
                 prog.removed_files = len(stale)
 
             prog.state = "indexing"
+            pending: list[tuple[FileEntry, list[str]]] = []
+            pending_chunks = 0
+
+            def flush() -> None:
+                nonlocal pending, pending_chunks
+                if not pending:
+                    return
+                # One embed call across files: far better ONNX batch
+                # utilization than per-file calls on small documents.
+                to_embed = [
+                    f"{_embed_header(e.path)}\n{t}" for e, texts in pending for t in texts
+                ]
+                vectors = self.embedder.embed_passages(to_embed)
+                offset = 0
+                for e, texts in pending:
+                    vecs = vectors[offset : offset + len(texts)]
+                    offset += len(texts)
+                    self.store.replace_file(e.path, e.mtime_ns, e.size, texts, vecs)
+                    prog.indexed_files += 1
+                    prog.total_chunks += len(texts)
+                    prog.processed_files += 1
+                pending = []
+                pending_chunks = 0
+
             for entry in entries:
                 prog.current_path = entry.path
                 if known.get(entry.path) == (entry.mtime_ns, entry.size):
                     prog.skipped_files += 1
-                else:
-                    self._index_one(entry, prog)
-                prog.processed_files += 1
+                    prog.processed_files += 1
+                    continue
+                text = extract_text(entry.path)
+                chunks = chunk_text(text) if text else []
+                if not chunks:
+                    # Unreadable/empty: record it so we don't retry every run.
+                    self.store.replace_file(entry.path, entry.mtime_ns, entry.size, [], [])
+                    prog.skipped_files += 1
+                    prog.processed_files += 1
+                    continue
+                pending.append((entry, [c.text for c in chunks]))
+                pending_chunks += len(chunks)
+                if pending_chunks >= EMBED_BATCH_CHUNKS:
+                    flush()
+            flush()
 
-            self.store.maybe_create_ann_index()
+            self.store.ensure_indexes()
             prog.state = "done"
         except Exception as exc:  # noqa: BLE001
             log.exception("indexing failed")
@@ -134,7 +179,8 @@ class Indexer:
             prog.skipped_files += 1
             return
         texts = [c.text for c in chunks]
-        vectors = self.embedder.embed_passages(texts)
+        header = _embed_header(entry.path)
+        vectors = self.embedder.embed_passages([f"{header}\n{t}" for t in texts])
         self.store.replace_file(entry.path, entry.mtime_ns, entry.size, texts, vectors)
         prog.indexed_files += 1
         prog.total_chunks += len(texts)
@@ -172,6 +218,7 @@ class Indexer:
 
     def _apply_changes(self, paths: set[str]) -> None:
         removed: list[str] = []
+        reindexed = 0
         for raw in paths:
             p = Path(raw)
             try:
@@ -184,6 +231,7 @@ class Indexer:
                 entry = FileEntry(path=str(p), mtime_ns=stat.st_mtime_ns, size=stat.st_size)
                 try:
                     self._index_one(entry, self.progress)
+                    reindexed += 1
                     log.info("re-indexed %s", p)
                 except Exception:  # noqa: BLE001
                     log.exception("failed to re-index %s", p)
@@ -192,3 +240,7 @@ class Indexer:
         if removed:
             self.store.remove_files(removed)
             log.info("removed %d deleted file(s) from index", len(removed))
+        if reindexed and self.store.stats()["chunks"] <= WATCH_FTS_REBUILD_MAX:
+            # Keep BM25 fresh for live edits; on huge libraries vector search
+            # covers new rows until the next full index run.
+            self.store.ensure_indexes()

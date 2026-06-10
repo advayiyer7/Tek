@@ -18,6 +18,7 @@ from tek.config import Config
 from tek.embed import FastEmbedEmbedder
 from tek.indexer import Indexer
 from tek.rag import retrieve
+from tek.rerank import Reranker
 from tek.scanner import scan_folders
 from tek.store import Store
 
@@ -58,7 +59,23 @@ PROBES: dict[str, str] = {
     "what is my router admin address": "notes/wifi.txt",
     "what days do I do deadlifts": "health/workout.md",
     "how should I rebalance my portfolio": "finance/investments.md",
+    # Keyword-exact probes: pure vector search is weak here; BM25 must carry.
+    "192.168.1.40": "notes/wifi.txt",
+    "HMAC-SHA256 signature": "work/api_design.md",
+    "GMK keycaps": "tech/keyboard.txt",
+    "docker system prune": "tech/docker_cheatsheet.md",
+    # Paraphrase probes: no shared keywords with the target text.
+    "is it okay to put cream in carbonara": "recipes/carbonara.md",
+    "when can tomatoes go in the ground": "personal/garden.txt",
+    "how much should I set aside from freelance pay": "finance/tax_notes_2025.md",
 }
+
+# Queries with no answer in the corpus: retrieval must return nothing
+# (the no-answer signal the chat UI relies on for honesty).
+NEGATIVE_PROBES = [
+    "what is the capital of mongolia",
+    "transcript of my call with the dentist",
+]
 
 
 def main() -> int:
@@ -102,19 +119,43 @@ def main() -> int:
         chunks = chunk_text(long_doc)
         assert len(chunks) > 3 and all(len(c.text) <= 2200 for c in chunks)
 
+        reranker = Reranker(config.settings.rerank_model, str(config.models_dir))
+        # Load outside the timing loop (first call downloads the model once).
+        warm = reranker.rerank("warmup query", ["warmup passage"])
+        print(f"reranker: {'active' if warm is not None else 'UNAVAILABLE (fusion-only)'}")
+
         passed = 0
         t0 = time.perf_counter()
         for query, expected_rel in PROBES.items():
             expected = str(corpus_dir / expected_rel)
-            hits = retrieve(store, embedder, query, k=5)
+            hits = retrieve(store, embedder, query, k=5, reranker=reranker)
             top = hits[0]["path"] if hits else "(no hits)"
             ok = top == expected
             passed += ok
             mark = "PASS" if ok else "FAIL"
-            print(f"  [{mark}] {query!r:55s} -> {Path(top).name} (score {hits[0]['score'] if hits else 0})")
+            detail = (
+                f"cos {hits[0]['score']:.2f}, ce {hits[0].get('rerank', float('nan')):.2f}"
+                if hits
+                else "no hits"
+            )
+            print(f"  [{mark}] {query!r:55s} -> {Path(top).name} ({detail})")
         avg_ms = (time.perf_counter() - t0) / len(PROBES) * 1000
-        print(f"\n{passed}/{len(PROBES)} probes correct top-1 · avg query {avg_ms:.0f}ms")
-        return 0 if passed == len(PROBES) else 1
+
+        neg_passed = 0
+        for query in NEGATIVE_PROBES:
+            hits = retrieve(store, embedder, query, k=5, reranker=reranker)
+            ok = len(hits) == 0
+            neg_passed += ok
+            mark = "PASS" if ok else "FAIL"
+            shown = "(correctly empty)" if ok else f"-> {Path(hits[0]['path']).name} (cos {hits[0]['score']:.2f}, ce {hits[0].get('rerank', 0):.3f})"
+            print(f"  [{mark}] NEG {query!r:51s} {shown}")
+
+        total = len(PROBES) + len(NEGATIVE_PROBES)
+        print(
+            f"\n{passed}/{len(PROBES)} probes top-1 correct, "
+            f"{neg_passed}/{len(NEGATIVE_PROBES)} negatives empty · avg query {avg_ms:.0f}ms"
+        )
+        return 0 if passed + neg_passed == total else 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

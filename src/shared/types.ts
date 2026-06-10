@@ -15,6 +15,8 @@ export interface SidecarStatus {
 export interface TekSettings {
   folders: string[]
   embed_model: string
+  rerank_model: string
+  rerank_enabled: boolean
   llm_model: string
   watch_enabled: boolean
   cloud_enabled: boolean
@@ -46,6 +48,12 @@ export interface SearchResult {
 export interface SearchResponse {
   results: SearchResult[]
   tookMs: number
+}
+
+/** Prior conversation turn sent with a chat request for follow-up questions. */
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  content: string
 }
 
 export interface Citation {
