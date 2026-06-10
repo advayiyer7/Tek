@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Segoe UI Variable Text', 'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', ui-monospace, 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Tek ink scale — slightly blue-tinted dark neutrals */
+  --color-ink-950: #0b0e14;
+  --color-ink-900: #11151d;
+  --color-ink-800: #1a2029;
+  --color-ink-700: #252c38;
+
+  --animate-flow: flow 1.2s linear infinite;
+
+  @keyframes flow {
+    from {
+      background-position: 0 0;
+    }
+    to {
+      background-position: 16px 0;
+    }
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-zinc-200 antialiased;
+  overscroll-behavior: none;
+  user-select: none;
+}
+
+::selection {
+  @apply bg-teal-500/30 text-teal-100;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-zinc-700/60 bg-clip-padding;
+  border: 3px solid transparent;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-zinc-600/70;
+}

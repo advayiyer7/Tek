@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tek</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      'unsafe-inline' for scripts is required by Vite/React-refresh in dev.
+      Production CSP is tightened during packaging (Phase 7). The renderer is
+      sandboxed and never talks to the network: connect-src stays 'self'
+      (+ ws: for HMR).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws:"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
