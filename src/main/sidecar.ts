@@ -1,9 +1,9 @@
 import { ChildProcess, spawn } from 'child_process'
 import { createServer } from 'net'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
-import type { EchoResult, SidecarStatus } from '../shared/types'
+import type { SidecarStatus } from '../shared/types'
 
 const HEALTH_TIMEOUT_MS = 30_000
 const HEALTH_POLL_INTERVAL_MS = 250
@@ -41,12 +41,18 @@ export class Sidecar {
     try {
       const port = await getFreePort()
       const pythonPath = this.resolvePython()
-      const child = spawn(pythonPath, ['-u', 'server.py', '--port', String(port)], {
-        cwd: this.sidecarDir(),
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONUNBUFFERED: '1' },
-        windowsHide: true
-      })
+      const dataDir = join(app.getPath('userData'), 'tek-data')
+      mkdirSync(dataDir, { recursive: true })
+      const child = spawn(
+        pythonPath,
+        ['-u', 'server.py', '--port', String(port), '--data-dir', dataDir],
+        {
+          cwd: this.sidecarDir(),
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+          windowsHide: true
+        }
+      )
       this.child = child
 
       child.stdout?.on('data', (chunk) => console.log('[sidecar]', String(chunk).trimEnd()))
@@ -78,21 +84,47 @@ export class Sidecar {
     }
   }
 
-  async ping(message: string): Promise<EchoResult> {
+  get baseUrl(): string {
     const { state, port } = this.currentStatus
     if (state !== 'online' || !port) {
       throw new Error(`Sidecar is not online (state: ${state})`)
     }
-    const startedAt = performance.now()
-    const res = await fetch(`http://127.0.0.1:${port}/echo`, {
+    return `http://127.0.0.1:${port}`
+  }
+
+  /** JSON request to the sidecar; throws with the API's error detail on 4xx/5xx. */
+  async request<T>(path: string, init?: { method?: string; body?: unknown; timeoutMs?: number }): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: init?.method ?? (init?.body !== undefined ? 'POST' : 'GET'),
+      headers: { 'content-type': 'application/json' },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(init?.timeoutMs ?? REQUEST_TIMEOUT_MS)
+    })
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`
+      try {
+        const data = (await res.json()) as { detail?: string }
+        if (data.detail) detail = data.detail
+      } catch {
+        // non-JSON error body — keep the status text
+      }
+      throw new Error(detail)
+    }
+    return (await res.json()) as T
+  }
+
+  /** Raw streaming POST (NDJSON endpoints like /chat). Caller owns the body. */
+  async stream(path: string, body: unknown, signal: AbortSignal): Promise<Response> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      body: JSON.stringify(body),
+      signal
     })
-    if (!res.ok) throw new Error(`Sidecar /echo returned HTTP ${res.status}`)
-    const data = (await res.json()) as Omit<EchoResult, 'mainLatencyMs'>
-    return { ...data, mainLatencyMs: Math.round((performance.now() - startedAt) * 10) / 10 }
+    if (!res.ok || !res.body) {
+      throw new Error(`Sidecar ${path} returned HTTP ${res.status}`)
+    }
+    return res
   }
 
   stop(): void {

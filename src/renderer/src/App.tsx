@@ -1,54 +1,88 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { SidecarStatus } from '../../shared/types'
-import { Header } from './components/Header'
-import { Pipeline } from './components/Pipeline'
-import { PingConsole } from './components/PingConsole'
+import { useEffect, useState } from 'react'
+import { Sidebar, type Page } from './components/Sidebar'
+import { useIndexStatus, useOllamaStatus, useSettings, useSidecarStatus } from './lib/hooks'
+import { ActionsPage } from './pages/ActionsPage'
+import { ChatPage } from './pages/ChatPage'
+import { LibraryPage } from './pages/LibraryPage'
+import { SearchPage } from './pages/SearchPage'
+import { SettingsPage } from './pages/SettingsPage'
+
+const PAGE_TITLE: Record<Page, { title: string; hint: string }> = {
+  chat: { title: 'Chat', hint: 'grounded answers with citations' },
+  search: { title: 'Search', hint: 'semantic search, fully offline' },
+  library: { title: 'Library', hint: 'what Tek has indexed' },
+  actions: { title: 'Actions', hint: 'preview first, you approve everything' },
+  settings: { title: 'Settings', hint: 'engine, models, privacy' }
+}
 
 export default function App(): React.JSX.Element {
-  const [status, setStatus] = useState<SidecarStatus>({ state: 'starting' })
+  const [page, setPage] = useState<Page>('chat')
+  const sidecarStatus = useSidecarStatus()
+  const online = sidecarStatus.state === 'online'
+  const { settings, update, reload } = useSettings()
+  const indexStatus = useIndexStatus(online)
+  const { status: ollama, refresh: refreshOllama } = useOllamaStatus(online)
 
   useEffect(() => {
-    let mounted = true
-    void window.tek.getStatus().then((s) => {
-      if (mounted) setStatus(s)
-    })
-    const unsubscribe = window.tek.onStatus(setStatus)
-    return () => {
-      mounted = false
-      unsubscribe()
-    }
-  }, [])
+    if (online) void reload()
+  }, [online, reload])
 
-  const [pulseKey, setPulseKey] = useState(0)
-  const onRoundTrip = useCallback(() => setPulseKey((k) => k + 1), [])
+  const hasIndex = (indexStatus?.stats.files ?? 0) > 0
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden">
-      {/* Ambient backdrop */}
+    <div className="relative flex h-full overflow-hidden">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(1100px 500px at 50% -10%, rgba(20,184,166,0.07), transparent 60%), radial-gradient(800px 400px at 85% 110%, rgba(99,102,241,0.05), transparent 60%)'
+            'radial-gradient(1100px 500px at 60% -10%, rgba(20,184,166,0.06), transparent 60%)'
         }}
       />
 
-      <Header status={status} />
+      <Sidebar page={page} onNavigate={setPage} status={sidecarStatus} />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 overflow-hidden px-6 pb-6 pt-8">
-        <Pipeline status={status} pulseKey={pulseKey} />
-        <PingConsole status={status} onRoundTrip={onRoundTrip} />
-      </main>
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        <header className="flex items-baseline gap-3 border-b border-ink-700/50 px-6 py-3.5">
+          <h1 className="text-[15px] font-semibold text-zinc-100">{PAGE_TITLE[page].title}</h1>
+          <span className="text-[11px] text-zinc-600">{PAGE_TITLE[page].hint}</span>
+          {sidecarStatus.state === 'error' ? (
+            <span className="ml-auto truncate font-mono text-[11px] text-rose-400" title={sidecarStatus.error}>
+              engine error — see Settings
+            </span>
+          ) : null}
+        </header>
 
-      <footer className="relative z-10 flex items-center justify-between border-t border-ink-700/50 px-6 py-2.5 font-mono text-[11px] text-zinc-600">
-        <span>
-          electron {window.tek.versions.electron} · chromium {window.tek.versions.chrome} · node{' '}
-          {window.tek.versions.node}
-          {status.python ? ` · python ${status.python}` : ''}
-        </span>
-        <span>phase 1 — sidecar wiring</span>
-      </footer>
+        <main className="min-h-0 flex-1">
+          {page === 'chat' ? (
+            <ChatPage
+              online={online}
+              hasIndex={hasIndex}
+              ollama={ollama}
+              onGoToLibrary={() => setPage('library')}
+            />
+          ) : page === 'search' ? (
+            <SearchPage online={online} />
+          ) : page === 'library' ? (
+            <LibraryPage
+              online={online}
+              settings={settings}
+              updateSettings={update}
+              indexStatus={indexStatus}
+            />
+          ) : page === 'actions' ? (
+            <ActionsPage online={online} ollama={ollama} />
+          ) : (
+            <SettingsPage
+              online={online}
+              settings={settings}
+              updateSettings={update}
+              ollama={ollama}
+              refreshOllama={refreshOllama}
+            />
+          )}
+        </main>
+      </div>
     </div>
   )
 }

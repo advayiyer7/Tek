@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
+import { registerIpc } from './ipc'
 import { Sidecar } from './sidecar'
 
 const sidecar = new Sidecar()
@@ -7,10 +8,10 @@ let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    minWidth: 760,
-    minHeight: 540,
+    width: 1280,
+    height: 800,
+    minWidth: 880,
+    minHeight: 600,
     show: false,
     title: 'Tek',
     backgroundColor: '#0b0e14',
@@ -41,37 +42,44 @@ function createWindow(): void {
   }
 }
 
-ipcMain.handle('sidecar:get-status', () => sidecar.status)
-ipcMain.handle('sidecar:ping', (_event, message: unknown) => {
-  if (typeof message !== 'string' || message.length === 0 || message.length > 10_000) {
-    throw new Error('Invalid message')
-  }
-  return sidecar.ping(message)
-})
+registerIpc(sidecar)
 
 sidecar.onStatusChange((status) => {
   mainWindow?.webContents.send('sidecar:status', status)
 
-  // Startup self-test: prove the main -> sidecar leg works and log it, so the
-  // round-trip is verifiable from the terminal without touching the UI.
+  // Startup self-test: prove the main -> sidecar leg from the terminal.
   if (status.state === 'online') {
     sidecar
-      .ping('startup self-test')
-      .then((result) =>
-        console.log(`[tek] sidecar round-trip ok in ${result.mainLatencyMs}ms — ${result.reply}`)
+      .request<{ version: string; index: { files: number; chunks: number } }>('/health')
+      .then((health) =>
+        console.log(
+          `[tek] sidecar v${health.version} online — index: ${health.index.files} files / ${health.index.chunks} chunks`
+        )
       )
-      .catch((err) => console.error('[tek] startup self-test failed:', err))
+      .catch((err) => console.error('[tek] startup health check failed:', err))
   }
 })
 
-app.whenReady().then(() => {
-  void sidecar.start()
-  createWindow()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
   })
-})
+
+  app.whenReady().then(() => {
+    void sidecar.start()
+    createWindow()
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
