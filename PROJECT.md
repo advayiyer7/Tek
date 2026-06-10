@@ -61,10 +61,10 @@ download, hosted on my portfolio.
 
 ## Remaining / future
 
+- [x] Bundled Python runtime (python-build-standalone 3.12, fetched at dist
+  time into resources/python) — installed apps no longer need system Python
 - [ ] Real-data validation pass (point at a big folder; tune chunking, scores)
-- [ ] App icon + signed installers; produce + test a real .exe/.dmg/.AppImage
-- [ ] Bundle a Python runtime (drop the system-Python requirement) — or ship
-  inference fully in-sidecar via llama.cpp
+- [ ] Code-signed installers (unsigned .exe trips SmartScreen)
 - [ ] Guided Ollama first-run (auto-pull model with progress)
 - [ ] Cloud provider opt-in (keys in OS keychain via safeStorage)
 - [ ] Flourishes: confidence scores, image embeddings (CLIP), OCR for scans
@@ -86,3 +86,5 @@ download, hosted on my portfolio.
 | 2026-06-10 | Cross-encoder rerank (Xenova/ms-marco-MiniLM-L-6-v2 via fastembed) with prob floor 0.02 | Big top-k precision win at ~150ms; floor gives an honest "no answer" signal (negative probes return empty) |
 | 2026-06-10 | Embed `parent/filename` header with each chunk (never stored) | Connects topic queries to the file they live in; zero storage cost |
 | 2026-06-10 | Chunks-table schema change ⇒ drop + rebuild on open | Index is a cache of local files; a one-time reindex beats migration code |
+| 2026-06-10 | Bundle python-build-standalone (~44MB) instead of the official embeddable zip | Embeddable distro lacks venv/pip; PBS is a full runtime, so first-run bootstrap works unchanged |
+| 2026-06-10 | Bundle interpreter only; deps still pip-install to userData on first run | Installer stays ~125MB instead of ~400MB; wheels download once with a progress state |

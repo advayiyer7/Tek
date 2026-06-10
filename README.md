@@ -51,7 +51,8 @@ execute only in the main process, only after explicit confirmation.
 
 ## Development
 
-Prerequisites: Node 20+, Python 3.10+.
+Prerequisites: Node 20+, Python 3.10+. (End users need neither — installers
+bundle a standalone Python runtime and set everything up on first launch.)
 
 ```sh
 npm install            # JS deps (downloads Electron)

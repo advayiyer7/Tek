@@ -174,6 +174,14 @@ export class Sidecar {
       : join(this.venvDir(), 'bin', 'python')
   }
 
+  /** Standalone CPython shipped in resources/python (python-build-standalone),
+   * so installed apps never need system Python. */
+  private bundledPython(): string {
+    return process.platform === 'win32'
+      ? join(process.resourcesPath, 'python', 'python.exe')
+      : join(process.resourcesPath, 'python', 'bin', 'python3')
+  }
+
   private async ensurePython(): Promise<string> {
     const venvPython = this.venvPython()
     if (existsSync(venvPython)) return venvPython
@@ -182,20 +190,28 @@ export class Sidecar {
       // an early-exit error pointing at `npm run sidecar:setup`.
       return process.platform === 'win32' ? 'python' : 'python3'
     }
-    // Packaged first run: build the environment once. Requires a system
-    // Python 3.10+ — installer-bundled runtime is a future improvement.
-    const systemPython = process.platform === 'win32' ? 'python' : 'python3'
-    console.log('[tek] first run — creating Python environment (one time, ~1 min)')
+    // Packaged first run: build the environment once with the bundled
+    // runtime (system Python is only a fallback for builds without one).
+    const bundled = this.bundledPython()
+    const bootstrap = existsSync(bundled)
+      ? bundled
+      : process.platform === 'win32'
+        ? 'python'
+        : 'python3'
+    console.log(`[tek] first run — creating Python environment with ${bootstrap} (one time, ~1 min)`)
     try {
-      await runOnce(systemPython, ['-m', 'venv', this.venvDir()])
+      await runOnce(bootstrap, ['-m', 'venv', this.venvDir()])
       await runOnce(venvPython, [
         '-m', 'pip', 'install', '--no-input', '--quiet',
         '-r', join(this.sidecarDir(), 'requirements.txt')
       ])
     } catch (err) {
       throw new Error(
-        'Tek could not set up its Python engine. Install Python 3.10+ from python.org ' +
-          `and relaunch. (${err instanceof Error ? err.message : String(err)})`
+        'Tek could not set up its Python engine. ' +
+          (existsSync(bundled)
+            ? 'Try reinstalling Tek. '
+            : 'Install Python 3.10+ from python.org and relaunch. ') +
+          `(${err instanceof Error ? err.message : String(err)})`
       )
     }
     return venvPython

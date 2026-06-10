@@ -26,6 +26,11 @@ win:
   target:
     - target: nsis
       arch: [x64]
+  # Standalone CPython (python-build-standalone) so installed apps never
+  # need system Python. Fetched at dist time by scripts/fetch-python.mjs.
+  extraResources:
+    - from: build-python/win32-x64/python
+      to: python
 
 nsis:
   oneClick: true
@@ -36,11 +41,17 @@ mac:
     - target: dmg
       arch: [arm64, x64]
   category: public.app-category.productivity
+  extraResources:
+    - from: build-python/darwin-${arch}/python
+      to: python
 
 linux:
   target:
     - target: AppImage
       arch: [x64]
   category: Utility
+  extraResources:
+    - from: build-python/linux-x64/python
+      to: python
 
 npmRebuild: false

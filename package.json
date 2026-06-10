@@ -15,10 +15,11 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "sidecar:setup": "node scripts/setup-sidecar.mjs",
     "sidecar:eval": "sidecar/.venv/Scripts/python sidecar/eval_retrieval.py",
-    "dist": "electron-vite build && electron-builder --publish never",
-    "dist:win": "electron-vite build && electron-builder --win --publish never",
-    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
-    "dist:linux": "electron-vite build && electron-builder --linux --publish never"
+    "python:fetch": "node scripts/fetch-python.mjs",
+    "dist": "node scripts/fetch-python.mjs && electron-vite build && electron-builder --publish never",
+    "dist:win": "node scripts/fetch-python.mjs && electron-vite build && electron-builder --win --publish never",
+    "dist:mac": "node scripts/fetch-python.mjs && electron-vite build && electron-builder --mac --publish never",
+    "dist:linux": "node scripts/fetch-python.mjs && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "react": "^19.2.0",
