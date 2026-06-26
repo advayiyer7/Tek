@@ -21,6 +21,11 @@ __pycache__/
 .tek/
 *.lance/
 
+# Eval scratch (model cache, debug index, raw run streams)
+sidecar/.eval_models/
+sidecar/.debug_stress/
+sidecar/eval_stress_*.err
+
 # Secrets — never commit keys
 .env
 .env.*

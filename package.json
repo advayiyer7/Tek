@@ -1,6 +1,6 @@
 {
   "name": "tek",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Tek — a local-first AI agent for your files",
   "main": "./out/main/index.js",
   "author": "Advay Iyer",

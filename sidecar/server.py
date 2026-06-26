@@ -30,7 +30,7 @@ from tek import rag
 from tek.config import Config
 from tek.embed import FastEmbedEmbedder
 from tek.indexer import Indexer
-from tek.rerank import Reranker
+from tek.reranker_factory import build_reranker
 from tek.store import Store
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -45,10 +45,10 @@ config: Config
 embedder: FastEmbedEmbedder
 store: Store
 indexer: Indexer
-reranker: Reranker
+reranker: object  # fastembed Reranker or OnnxReranker (same duck-typed interface)
 
 
-def _active_reranker() -> Reranker | None:
+def _active_reranker():
     return reranker if config.settings.rerank_enabled else None
 
 
@@ -60,6 +60,8 @@ class SettingsUpdate(BaseModel):
     llm_model: str | None = None
     watch_enabled: bool | None = None
     rerank_enabled: bool | None = None
+    rerank_backend: str | None = Field(default=None, pattern="^(fastembed|tek-onnx)$")
+    rerank_onnx_dir: str | None = None
 
 
 class ChatTurn(BaseModel):
@@ -116,6 +118,7 @@ def health() -> dict:
             "name": reranker.model_name,
             "ready": reranker.is_ready,
             "enabled": config.settings.rerank_enabled,
+            "backend": config.settings.rerank_backend,
         },
         "index": store.stats(),
     }
@@ -140,6 +143,10 @@ def put_settings(update: SettingsUpdate) -> dict:
         indexer.stop_watcher()
         if settings.folders:
             indexer.start_watcher()
+    if "rerank_backend" in changes or "rerank_onnx_dir" in changes:
+        # Hot-swap the reranker so the A/B switch takes effect without a restart.
+        global reranker
+        reranker = build_reranker(settings, str(config.models_dir))
     return settings.model_dump()
 
 
@@ -251,7 +258,7 @@ def main() -> None:
     embedder = FastEmbedEmbedder(config.settings.embed_model, str(config.models_dir))
     store = Store(config.db_dir, dim=embedder.dim)
     indexer = Indexer(config=config, embedder=embedder, store=store)
-    reranker = Reranker(config.settings.rerank_model, str(config.models_dir))
+    reranker = build_reranker(config.settings, str(config.models_dir))
     if config.settings.folders and config.settings.watch_enabled:
         indexer.start_watcher()
 

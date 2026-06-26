@@ -26,6 +26,11 @@ class Settings(BaseModel):
     embed_model: str = DEFAULT_EMBED_MODEL
     rerank_model: str = DEFAULT_RERANK_MODEL
     rerank_enabled: bool = True
+    # Reranker backend, for A/B-ing the trained model against the incumbent:
+    #   "fastembed" — off-the-shelf ms-marco MiniLM via fastembed (default)
+    #   "tek-onnx"  — the trained, int8-quantized cross-encoder (rerank_onnx_dir)
+    rerank_backend: str = "fastembed"
+    rerank_onnx_dir: str = ""
     llm_model: str = DEFAULT_LLM_MODEL
     watch_enabled: bool = True
     # Cloud is strictly opt-in and unused unless explicitly enabled. Keys are

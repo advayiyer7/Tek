@@ -1,0 +1,19 @@
+# Loose top-level deps. The frozen, fully-pinned set lives in requirements.txt
+# (produced by `pip freeze` after a successful install) for reproducibility.
+#
+# Training stack
+torch                      # CPU wheel, installed from the pytorch cpu index
+sentence-transformers      # CrossEncoder training API
+transformers
+optimum[onnxruntime]       # ONNX export
+onnx
+onnxruntime
+wandb                      # run logging (offline mode by default)
+tokenizers                 # serve-time tokenizer for the exported ONNX model
+scikit-learn               # metrics helpers
+#
+# Tek runtime deps (so we can import the real pipeline + run the real benchmark)
+fastembed
+lancedb
+pydantic
+numpy

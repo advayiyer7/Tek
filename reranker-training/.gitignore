@@ -1,0 +1,9 @@
+.venv/
+data/
+models/
+runs/
+wandb/
+__pycache__/
+*.pyc
+.eval_models/
+*.onnx
