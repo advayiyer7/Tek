@@ -1,0 +1,89 @@
+{
+  "scale": true,
+  "index": {
+    "files": 1562,
+    "chunks": 24090,
+    "seconds": 3698.9,
+    "chunks_per_s": 6.5,
+    "ann_index_eligible": true
+  },
+  "categories": {
+    "legacy": {
+      "n": 19,
+      "top1": 1.0,
+      "recall5": 1.0,
+      "mrr": 1.0
+    },
+    "direct": {
+      "n": 15,
+      "top1": 0.8667,
+      "recall5": 0.8667,
+      "mrr": 0.8667
+    },
+    "keyword": {
+      "n": 16,
+      "top1": 1.0,
+      "recall5": 1.0,
+      "mrr": 1.0
+    },
+    "paraphrase": {
+      "n": 18,
+      "top1": 0.5,
+      "recall5": 0.5556,
+      "mrr": 0.5139
+    },
+    "confusable": {
+      "n": 28,
+      "top1": 0.9286,
+      "recall5": 0.9643,
+      "mrr": 0.9464
+    },
+    "version": {
+      "n": 6,
+      "top1": 0.6667,
+      "recall5": 0.8333,
+      "mrr": 0.75
+    },
+    "temporal": {
+      "n": 8,
+      "top1": 1.0,
+      "recall5": 1.0,
+      "mrr": 1.0
+    },
+    "typo": {
+      "n": 15,
+      "top1": 0.4,
+      "recall5": 0.4,
+      "mrr": 0.4
+    },
+    "vague": {
+      "n": 12,
+      "top1": 0.9167,
+      "recall5": 0.9167,
+      "mrr": 0.9167
+    },
+    "needle": {
+      "n": 11,
+      "top1": 0.8182,
+      "recall5": 0.8182,
+      "mrr": 0.8182
+    }
+  },
+  "overall": {
+    "positives_n": 148,
+    "top1": 0.8176,
+    "recall5": 0.8378,
+    "mrr10": 0.826,
+    "neg_n": 24,
+    "neg_rejected": 0.875,
+    "neg_near_rejected": 0.75,
+    "neg_far_rejected": 1.0,
+    "twohop_n": 6,
+    "twohop_recall8": 0.5,
+    "latency_p50_ms": 956.8,
+    "latency_p95_ms": 1227.2,
+    "latency_mean_ms": 758.4,
+    "concurrency_errors": 0,
+    "concurrency_qps": 1.91
+  }
+}

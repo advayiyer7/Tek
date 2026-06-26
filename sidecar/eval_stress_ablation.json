@@ -1,0 +1,90 @@
+{
+  "scale": false,
+  "index": {
+    "files": 172,
+    "chunks": 214,
+    "seconds": 76.4,
+    "chunks_per_s": 2.8,
+    "ann_index_eligible": false
+  },
+  "no_rerank": true,
+  "categories": {
+    "legacy": {
+      "n": 19,
+      "top1": 1.0,
+      "recall5": 1.0,
+      "mrr": 1.0
+    },
+    "direct": {
+      "n": 15,
+      "top1": 1.0,
+      "recall5": 1.0,
+      "mrr": 1.0
+    },
+    "keyword": {
+      "n": 16,
+      "top1": 0.6875,
+      "recall5": 1.0,
+      "mrr": 0.8073
+    },
+    "paraphrase": {
+      "n": 18,
+      "top1": 0.7222,
+      "recall5": 1.0,
+      "mrr": 0.8287
+    },
+    "confusable": {
+      "n": 28,
+      "top1": 0.9643,
+      "recall5": 1.0,
+      "mrr": 0.9762
+    },
+    "version": {
+      "n": 6,
+      "top1": 0.6667,
+      "recall5": 1.0,
+      "mrr": 0.8333
+    },
+    "temporal": {
+      "n": 8,
+      "top1": 0.625,
+      "recall5": 0.875,
+      "mrr": 0.7708
+    },
+    "typo": {
+      "n": 15,
+      "top1": 0.7333,
+      "recall5": 0.8667,
+      "mrr": 0.8162
+    },
+    "vague": {
+      "n": 12,
+      "top1": 0.9167,
+      "recall5": 1.0,
+      "mrr": 0.9583
+    },
+    "needle": {
+      "n": 11,
+      "top1": 0.8182,
+      "recall5": 1.0,
+      "mrr": 0.8818
+    }
+  },
+  "overall": {
+    "positives_n": 148,
+    "top1": 0.8446,
+    "recall5": 0.9797,
+    "mrr10": 0.9039,
+    "neg_n": 24,
+    "neg_rejected": 0.0,
+    "neg_near_rejected": 0.0,
+    "neg_far_rejected": 0.0,
+    "twohop_n": 6,
+    "twohop_recall8": 0.8333,
+    "latency_p50_ms": 133.8,
+    "latency_p95_ms": 210.2,
+    "latency_mean_ms": 133.1,
+    "concurrency_errors": 0,
+    "concurrency_qps": 36.27
+  }
+}
